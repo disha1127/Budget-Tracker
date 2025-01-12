@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-wallet"></i> Expense Tracker</h1>
+            {% if current_user.is_authenticated %}
+                <p>Welcome, {{ current_user.username }}! ({{ current_user.email }}) <a href="{{ url_for('logout') }}">Logout</a></p>
+            {% endif %}
+        </header>
+        
+        <div class="budget-info">
+            <h2><i class="fas fa-chart-pie"></i> Budget Information</h2>
+            {% if budget %}
+                <p><i class="fas fa-money-bill-wave"></i> {{ budget[2].capitalize() }} Budget: ₹{{ "%.2f"|format(budget[3]) }}</p>
+                <p><i class="fas fa-shopping-cart"></i> Current Spending: ₹{{ "%.2f"|format(total_spending) }}</p>
+                <p><i class="fas fa-piggy-bank"></i> Remaining: ₹{{ "%.2f"|format(budget[3] - total_spending) }}</p>
+            {% else %}
+                <p><i class="fas fa-exclamation-circle"></i> No budget set. Please set a budget below.</p>
+            {% endif %}
+        </div>
+
+        <form action="{{ url_for('set_budget') }}" method="post" class="budget-form">
+            <h2><i class="fas fa-coins"></i> Set Budget</h2>
+            <select name="type" required>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+            </select>
+            <input type="number" name="amount" step="0.01" placeholder="Budget Amount (₹)" required>
+            <button type="submit"><i class="fas fa-save"></i> Set Budget</button>
+        </form>
+        
+        <form action="{{ url_for('add_expense') }}" method="post" class="expense-form">
+            <h2><i class="fas fa-plus-circle"></i> Add Expenses</h2>
+            <div class="expense-date">
+                <label for="expense-date">Date:</label>
+                <input type="date" id="expense-date" name="date" required>
+            </div>
+            {% for expense_type in expense_types %}
+            <div class="expense-category">
+                <h3>{{ expense_type }}</h3>
+                <input type="text" name="description_{{ expense_type }}" placeholder="Description (optional)">
+                <input type="number" name="amount_{{ expense_type }}" step="0.01" placeholder="Amount (₹)">
+            </div>
+            {% endfor %}
+            <p class="form-note"><i class="fas fa-info-circle"></i> Description is optional for each category.</p>
+            <button type="submit"><i class="fas fa-plus"></i> Add Expenses</button>
+        </form>
+
+        <div class="expense-list">
+            <h2><i class="fas fa-list"></i> Expenses by Category</h2>
+            {% for expense_type in expense_types %}
+            <div class="expense-section">
+                <h3>
+                    {% if expense_type == 'Food' %}
+                        <i class="fas fa-utensils"></i>
+                    {% elif expense_type == 'Transportation' %}
+                        <i class="fas fa-car"></i>
+                    {% elif expense_type == 'Entertainment' %}
+                        <i class="fas fa-film"></i>
+                    {% elif expense_type == 'Utilities' %}
+                        <i class="fas fa-bolt"></i>
+                    {% else %}
+                        <i class="fas fa-question-circle"></i>
+                    {% endif %}
+                    {{ expense_type }}
+                </h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses_by_type[expense_type] %}
+                        <tr>
+                            <td>{{ expense[2] }}</td>
+                            <td>{{ expense[3] }}</td>
+                            <td>₹{{ "%.2f"|format(expense[4]) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div id="notification" class="notification hidden">
+        <h3><i class="fas fa-bell"></i> Daily Expense Reminder</h3>
+        <p>What did you spend today?</p>
+        <select id="dailyExpenseType">
+            {% for expense_type in expense_types %}
+            <option value="{{ expense_type }}">{{ expense_type }}</option>
+            {% endfor %}
+        </select>
+        <input type="number" id="dailyExpense" step="0.01" placeholder="Enter amount (₹)">
+        <button onclick="submitDailyExpense()"><i class="fas fa-paper-plane"></i> Submit</button>
+    </div>
+
+    <script>
+        function showNotification() {
+            document.getElementById('notification').classList.remove('hidden');
+        }
+
+        function hideNotification() {
+            document.getElementById('notification').classList.add('hidden');
+        }
+
+        function submitDailyExpense() {
+            const amount = document.getElementById('dailyExpense').value;
+            const type = document.getElementById('dailyExpenseType').value;
+            if (amount) {
+                fetch('/add_daily_expense', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({amount: amount, type: type}),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Daily expense added successfully!');
+                        hideNotification();
+                        location.reload();
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            }
+        }
+
+        function scheduleNotification() {
+            const now = new Date();
+            const night = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                21, 0, 0 // 9:00 PM
+            );
+            
+            let delay = night.getTime() - now.getTime();
+            if (delay < 0) {
+                delay += 86400000; // Add a day if it's past 9 PM
+            }
+            
+            setTimeout(showNotification, delay);
+        }
+
+        // Schedule the notification when the page loads
+        scheduleNotification();
+
+        // Reschedule the notification every 24 hours
+        setInterval(scheduleNotification, 86400000);
+    </script>
+</body>
+</html>
