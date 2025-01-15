@@ -32,14 +32,6 @@ Run the application:
 
    python app.py
 
-**Usage**
-
-Open your web browser and navigate to http://localhost:5000 (or the port you are using).
-
-Start adding your income and expenses using the provided form.
-
-Use the dashboard to view your financial summary and insights.
-
 **Contributing**
 
 Contributions are welcome! Please feel free to create a pull request or open an issue for enhancements and bug fixes.
